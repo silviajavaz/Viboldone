@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Prenotazioni Attività</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<h2>Prenota un'attività</h2>
+
+<form id="formPrenotazione">
+  <label>Nome:</label><br>
+  <input type="text" id="nome" required><br><br>
+
+  <label>Email:</label><br>
+  <input type="email" id="email" required><br><br>
+
+  <label>Attività e orario:</label><br>
+  <select id="fascia" required></select><br><br>
+
+  <label>Numero posti:</label><br>
+  <input type="number" id="postiRichiesti" min="1" required><br><br>
+
+  <button type="submit">Prenota</button>
+</form>
+
+<div id="messaggio"></div>
+
+<script>
+  // 🔧 INSERISCI QUI I TUOI DATI SUPABASE
+  const supabaseUrl = "https://supabase.com/dashboard/project/poxylxaazelpljwqyhpp/auth/policies?search=Prenotazioni&schema=public";
+  const supabaseKey = "Viboldone@82";
+  const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+  // 1️⃣ CARICA LE FASCE ORARIE
+  async function caricaFasce() {
+    const { data, error } = await supabase
+      .from("fasce_orarie")
+      .select("*")
+      .order("ora");
+
+    const select = document.getElementById("fascia");
+
+    data.forEach(f => {
+      const opt = document.createElement("option");
+      opt.value = JSON.stringify(f); // salvo l'intero oggetto
+      opt.textContent = `${f.attività} — ${f.ora} (posti: ${f.posti_disponibili})`;
+      select.appendChild(opt);
+    });
+  }
+
+  caricaFasce();
+
+  // 2️⃣ GESTIONE PRENOTAZIONE
+  document.getElementById("formPrenotazione").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const nome = document.getElementById("nome").value;
+    const email = document.getElementById("email").value;
+    const fascia = JSON.parse(document.getElementById("fascia").value);
+    const postiRichiesti = parseInt(document.getElementById("postiRichiesti").value);
+
+    // Controllo posti disponibili
+    if (postiRichiesti > fascia.posti_disponibili) {
+      document.getElementById("messaggio").innerHTML =
+        "<p style='color:red'>Posti insufficienti.</p>";
+      return;
+    }
+
+    // Salva prenotazione
+    await supabase.from("prenotazioni").insert({
+      nome: nome,
+      email: email,
+      attività: fascia.attività,
+      ora: fascia.ora,
+      posti_prenotati: postiRichiesti
+    });
+
+    // Scala i posti disponibili
+    await supabase
+      .from("fasce_orarie")
+      .update({ posti_disponibili: fascia.posti_disponibili - postiRichiesti })
+      .eq("id", fascia.id);
+
+    document.getElementById("messaggio").innerHTML =
+      "<p style='color:green'>Prenotazione effettuata!</p>";
+
+    document.getElementById("formPrenotazione").reset();
+  });
+</script>
+
+</body>
+</html>
